@@ -1,0 +1,32 @@
+[package]
+name = "ising"
+version = "0.2.0"
+edition = "2021"
+authors = ["dgront@chem.uw.edu.pl"]
+description = "Simple yet efficient Monte Carlo simulation of the 2D ising/Potts model"
+license = "Apache-2.0"
+repository = "https://github.com/dgront/ising"
+keywords = ["matrix", "loader", "csv", "tsv", "labels"]
+categories = ["science", "simulation"]
+homepage = "https://github.com/dgront/ising"
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = false
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+clap = { version = "4.3", features = ["derive"] }
+thiserror = "1.0"
+flate2 = "1.0"
+rand = "0.9"
+env_logger = "0.11.10"
+log = "0.4.34"
+image = "0.25.10"
+
+[lib]
+crate-type =["rlib", "cdylib"]
+
+[[bin]]
+name = "ising"
+path = "src/ising.rs"
