@@ -1,7 +1,8 @@
 use std::env;
+use std::time::Instant;
 use clap::Parser;
 use ising::Ising2D;
-use rand::{Rng, SeedableRng};
+use rand::{SeedableRng};
 use rand::rngs::StdRng;
 use log::info;
 
@@ -17,8 +18,8 @@ struct Args {
     outer_per_frame: usize,
 
     /// stem of the PNG files to be generated
-    #[arg(long, default_value_t = String::from("frame"))]
-    png_frames: String,
+    #[arg(long)]
+    png_frames: Option<String>,
 
     /// number of outer MC cycles
     #[arg(long, default_value_t = 100)]
@@ -53,23 +54,32 @@ fn main() {
     let mut model = Ising2D::new(args.n_side);
     let mut rng = StdRng::seed_from_u64(12345);
     model.randomize(&mut rng);
-    let filename = format!("{}{:06}.png", args.png_frames, 0);
-    model.save_png(&filename).unwrap();
+
+    if let Some(png_stem) = &args.png_frames {
+        let filename = format!("{}{:06}.png", png_stem, 0);
+        model.save_png(&filename).unwrap();
+    }
 
     let mut iframe = 0;
+    let start = Instant::now();
     for outer in 0..args.outer_cycles {
         let mut acceptance = 0.0;
         for _inner in 0..args.inner_cycles {
-            acceptance += model.metropolis_sweep_naive(1.0/args.temperature, &mut rng);
+            // acceptance += model.metropolis_sweep_naive(1.0/args.temperature, &mut rng);
+            acceptance += model.metropolis_sweep_checkerboard(1.0/args.temperature, &mut rng);
         }
         acceptance /= args.inner_cycles as f64;
 
         println!("{:4} {:.4} {:.4}", outer + 1, model.energy() / (model.n_spins() as f64), acceptance);
         // model.show();
-        if (outer + 1) % args.outer_per_frame == 0 {
-            iframe += 1;
-            let filename = format!("{}{:06}.png", args.png_frames, iframe);
-            model.save_png(&filename).unwrap();
+        if let Some(png_stem) = &args.png_frames {
+            if (outer + 1) % args.outer_per_frame == 0 {
+                iframe += 1;
+                let filename = format!("{}{:06}.png", png_stem, iframe);
+                model.save_png(&filename).unwrap();
+            }
         }
     }
+    let elapsed = start.elapsed();
+    info!("Elapsed: {:.3} s", elapsed.as_secs_f64());
 }

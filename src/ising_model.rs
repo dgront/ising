@@ -19,7 +19,7 @@ impl Ising2D {
 
     pub fn randomize<R: Rng>(&mut self, rng: &mut R) {
         for s in self.spins.iter_mut() {
-            *s = if rng.gen_bool(0.5) { 1 } else { -1 };
+            *s = if rng.random_bool(0.5) { 1 } else { -1 };
         }
     }
 
@@ -83,18 +83,18 @@ impl Ising2D {
             let x = i % n;
             let y = i / n;
 
-            let xm = if x == 0 { n - 1 } else { x - 1 };
-            let xp = if x + 1 == n { 0 } else { x + 1 };
-            let ym = if y == 0 { n - 1 } else { y - 1 };
-            let yp = if y + 1 == n { 0 } else { y + 1 };
+            let left = if x == 0 { n - 1 } else { x - 1 };
+            let right = if x + 1 == n { 0 } else { x + 1 };
+            let above = if y == 0 { n - 1 } else { y - 1 };
+            let below = if y + 1 == n { 0 } else { y + 1 };
 
             let s = self.spins[i] as i32;
 
             let neighbour_sum =
-                self.spins[y * n + xm] as i32
-                    + self.spins[y * n + xp] as i32
-                    + self.spins[ym * n + x] as i32
-                    + self.spins[yp * n + x] as i32;
+                self.spins[y * n + left] as i32
+                    + self.spins[y * n + right] as i32
+                    + self.spins[above * n + x] as i32
+                    + self.spins[below * n + x] as i32;
 
             let delta_e = 2 * s * neighbour_sum;
             if delta_e <= 0 || rng.random::<f64>() < (-beta * delta_e as f64).exp() {
@@ -108,24 +108,36 @@ impl Ising2D {
     pub fn metropolis_sweep_checkerboard<R: Rng>(&mut self, beta: f64, rng: &mut R) -> f64 {
 
         let mut n_accepted = 0;
+        let p4 = (-4.0 * beta).exp();
+        let p8 = (-8.0 * beta).exp();
         for parity in 0..2 {
             for y in 0..self.n_side {
                 let x0 = (y + parity) & 1;
+                let row  = y * self.n_side;
+                let up   = self.prev[y] * self.n_side;
+                let down = self.next[y] * self.n_side;
 
                 for x in (x0..self.n_side).step_by(2) {
-                    let i = y * self.n_side + x;
+                    let i = row + x;
 
                     let s = self.spins[i];
 
                     let nn =
-                        self.spins[y * self.n_side + self.prev[x]]
-                            + self.spins[y * self.n_side + self.next[x]]
-                            + self.spins[self.prev[y] * self.n_side + x]
-                            + self.spins[self.next[y] * self.n_side + x];
+                        self.spins[row + self.prev[x]] // left
+                            + self.spins[row + self.next[x]] // right
+                            + self.spins[up + x] // above
+                            + self.spins[down + x]; // below
 
-                    let de = 2 * s as i32 * nn as i32;
+                    let delta_e = 2 * s as i32 * nn as i32;
 
-                    if de <= 0 || rng.random::<f64>() < (-beta * de as f64).exp() {
+                    let accept = match delta_e {
+                        d if d <= 0 => true,
+                        4 => rng.random::<f64>() < p4,
+                        8 => rng.random::<f64>() < p8,
+                        _ => unreachable!(),
+                    };
+
+                    if accept {
                         self.spins[i] = -s;
                         n_accepted += 1;
                     }
@@ -135,6 +147,3 @@ impl Ising2D {
         n_accepted as f64 / self.n_spins() as f64
     }
 }
-
-#[inline(always)]
-fn idx(x: usize, y: usize, n: usize) -> usize { y * n + x }
