@@ -2,9 +2,13 @@ use image::{GrayImage, Luma};
 use rand::Rng;
 
 pub struct Ising2D {
+    /// The number of spins along one dimension. The total number of spins is `n_side * n_side`.
     n_side: usize,
+    /// The spins of the system, stored in a 1D row-major vector. The spin at position (x, y) can be accessed as `spins[y * n_side + x]`.
     spins: Vec<i8>,
+    /// The neighbour above, with periodic boundary conditions. For example, for a 3x3 system, `prev` would be `[1, 2, 0]`.
     prev: Vec<usize>,
+    /// The neighbour on the right, with periodic boundary conditions. For example, for a 3x3 system, `next` would be `[2, 0, 1]`.
     next: Vec<usize>,
 }
 
@@ -51,6 +55,59 @@ impl Ising2D {
         img.save(filename)
     }
 
+    /// Computes the per-spin magnetization of the Ising system
+    pub fn magnetization(&self) -> f64 {
+        let m: i64 = self.spins.iter().map(|&s| s as i64).sum();
+        return m as f64 / self.n_spins() as f64;
+    }
+
+    /// Largest connected cluster of equal spins.
+    ///
+    /// The method uses an iterative DFS with an explicit stack;
+    /// assumes 4-neighbor connectivity and periodic boundaries.
+    pub fn largest_cluster(&self) -> usize {
+        let l = self.n_side;
+        let n = self.spins.len();
+        let mut visited = vec![false; n];
+        let mut stack = Vec::new();
+        let mut largest = 0usize;
+
+        for start in 0..n {
+            if visited[start] { continue; }
+
+            let spin = self.spins[start];
+            visited[start] = true;
+            stack.push(start);
+
+            let mut cluster_size = 0;
+
+            while let Some(i) = stack.pop() {
+                cluster_size += 1;
+
+                let x = i % self.n_side;
+                let y = i / self.n_side;
+
+                let neighbors = [
+                    y * self.n_side + self.next[x], // right
+                    y * self.n_side + self.prev[x], // left
+                    self.next[y] * self.n_side + x, // down
+                    self.prev[y] * self.n_side + x, // up
+                ];
+
+                for j in neighbors {
+                    if !visited[j] && self.spins[j] == spin {
+                        visited[j] = true;
+                        stack.push(j);
+                    }
+                }
+            }
+            largest = largest.max(cluster_size);
+        }
+        return largest;
+    }
+
+
+    /// Computes the total energy of the Ising system
     pub fn energy(&self) -> f64 {
         let mut e: i64 = 0;
 

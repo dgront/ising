@@ -69,8 +69,10 @@ fn main() {
             acceptance += model.metropolis_sweep_checkerboard(1.0/args.temperature, &mut rng);
         }
         acceptance /= args.inner_cycles as f64;
-
-        println!("{:4} {:.4} {:.4}", outer + 1, model.energy() / (model.n_spins() as f64), acceptance);
+        let largest_per_spin = model.largest_cluster() as f64 / (model.n_spins() as f64);
+        println!("{:4} {:.4} {:.4} {:.4} {:.4}",
+                 outer + 1, model.energy() / (model.n_spins() as f64),
+                 model.magnetization(), largest_per_spin, acceptance);
         // model.show();
         if let Some(png_stem) = &args.png_frames {
             if (outer + 1) % args.outer_per_frame == 0 {
