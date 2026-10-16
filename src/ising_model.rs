@@ -21,6 +21,23 @@ impl Ising2D {
         Ising2D { n_side, spins, prev, next  }
     }
 
+    /// Loads a 2D Ising model from a PNG file.
+    ///
+    /// The PNG file should be a grayscale image where white and black pixels represent spin +1 and -1, respectively.
+    /// The size of the model is determined by the dimensions of the image, which must be square.
+    pub fn from_png(filename: &str) -> Result<Self, image::ImageError> {
+
+        let img = image::open(filename)?.to_luma8();
+
+        assert_eq!(img.width(), img.height(), "Expected a square lattice");
+
+        let n_side = img.width() as usize;
+        let mut model = Self::new(n_side);
+        model.spins = img.as_raw().iter().map(|&v| if v > 127 { 1 } else { -1 }).collect();
+
+        Ok(model)
+    }
+
     pub fn randomize<R: Rng>(&mut self, rng: &mut R) {
         for s in self.spins.iter_mut() {
             *s = if rng.random_bool(0.5) { 1 } else { -1 };
@@ -66,7 +83,7 @@ impl Ising2D {
     /// The method uses an iterative DFS with an explicit stack;
     /// assumes 4-neighbor connectivity and periodic boundaries.
     pub fn largest_cluster(&self) -> usize {
-        let l = self.n_side;
+
         let n = self.spins.len();
         let mut visited = vec![false; n];
         let mut stack = Vec::new();

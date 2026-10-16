@@ -25,20 +25,28 @@ struct Args {
     #[arg(long, default_value_t = 100)]
     outer_cycles: usize,
 
+    /// Seed for the random number generator
+    #[arg(long)]
+    seed: Option<usize>,
+
     /// temperature in reduced units
     #[arg(short = 't', long = "temperature", default_value_t = 10.0)]
     temperature: f64,
 
+    /// system size - number of spins along one dimension (creates a random conformation)
+    #[arg(short = 'l', long, required_unless_present = "in_png")]
+    n_side: Option<usize>,
+
     /// system size - number of spins along one dimension
-    #[arg(short = 'l', long = "length", default_value_t = 16)]
-    n_side: usize,
+    #[arg(short = 'i', long, required_unless_present = "n_side")]
+    in_png: Option<String>,
 
     /// be more verbose and log program actions on the screen
     #[clap(short, long, short='v')]
     verbose: bool
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     unsafe {
         if env::var("RUST_LOG").is_err() { env::set_var("RUST_LOG", "info") }
@@ -46,14 +54,29 @@ fn main() {
     }
     env_logger::init();
 
-    info!("spins = {}", args.n_side * args.n_side);
+    let mut rng;
+    if let Some(seed) = args.seed {
+        rng = StdRng::seed_from_u64(seed as u64);
+    } else {
+        rng = StdRng::from_os_rng();
+    }
+
+    let mut model = match (args.n_side, args.in_png) {
+        (Some(n), None) => {
+            let mut m = Ising2D::new(n);
+            m.randomize(&mut rng);
+            m
+        },
+        (None, Some(path)) => Ising2D::from_png(&path)?,
+        _ => unreachable!("clap ensures exactly one option"),
+    };
+
+    info!("spins = {}", model.n_spins());
     info!("inner-cycles = {}", args.inner_cycles);
     info!("outer-cycles = {}", args.outer_cycles);
     info!("temperature  = {}", args.temperature);
 
-    let mut model = Ising2D::new(args.n_side);
-    let mut rng = StdRng::seed_from_u64(12345);
-    model.randomize(&mut rng);
+
 
     if let Some(png_stem) = &args.png_frames {
         let filename = format!("{}{:06}.png", png_stem, 0);
@@ -84,4 +107,6 @@ fn main() {
     }
     let elapsed = start.elapsed();
     info!("Elapsed: {:.3} s", elapsed.as_secs_f64());
+
+    Ok(())
 }
